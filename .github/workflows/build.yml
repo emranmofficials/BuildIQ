@@ -1,0 +1,71 @@
+name: BuildIQ Android Debug Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Analyze, test and assemble debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter 3.50.1
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.1'
+          cache: true
+
+      - name: Verify toolchain
+        run: |
+          flutter --version
+          java -version
+          dart --version
+
+      - name: Install app dependencies
+        run: flutter pub get
+
+      - name: Install engine dependencies
+        working-directory: engine
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed lib test engine/lib engine/test
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Engine unit tests
+        working-directory: engine
+        run: dart test
+
+      - name: Flutter widget tests
+        run: flutter test
+
+      - name: Assemble debug APK
+        run: flutter build apk --debug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: buildiq-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
